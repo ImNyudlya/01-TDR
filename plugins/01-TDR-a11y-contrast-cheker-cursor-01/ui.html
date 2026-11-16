@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root {
+      --bg: var(--figma-color-bg, #ffffff);
+      --bg-secondary: var(--figma-color-bg-secondary, #f5f5f5);
+      --bg-tertiary: var(--figma-color-bg-tertiary, #e6e6e6);
+      --text: var(--figma-color-text, #1e1e1e);
+      --text-secondary: var(--figma-color-text-secondary, #757575);
+      --border: var(--figma-color-border, #e0e0e0);
+      --pass: #1b7f4e;
+      --pass-bg: #e6f5ed;
+      --fail: #c0362c;
+      --fail-bg: #fdecea;
+      --radius: 8px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* One scrollbar only: lock html, scroll on body. */
+    html {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 12px;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      font-family: var(--font);
+      font-size: 12px;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.35;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      margin: 0 0 10px;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 64px;
+      margin-bottom: 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      transition: background-color 120ms ease, color 120ms ease;
+    }
+
+    .preview-sample {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      padding: 10px 14px;
+      text-align: center;
+    }
+
+    .preview-sample.large {
+      font-size: 26px;
+    }
+
+    .ratio-block {
+      text-align: center;
+      margin-bottom: 8px;
+      padding: 10px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+    }
+
+    .ratio-value {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+
+    .ratio-label {
+      margin-top: 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .colors {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+      gap: 6px;
+      align-items: start;
+      margin-bottom: 8px;
+      max-width: 100%;
+    }
+
+    .color-field {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .color-field label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .color-row {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 4px;
+      align-items: center;
+      max-width: 100%;
+    }
+
+    input[type="color"] {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      height: 28px;
+      padding: 0 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+
+    input[type="text"]:focus {
+      outline: 2px solid var(--text);
+      outline-offset: -1px;
+    }
+
+    .swap {
+      width: 28px;
+      height: 28px;
+      margin-top: 18px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-secondary);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .swap:hover { background: var(--bg-tertiary); }
+
+    .meta {
+      margin: 0 0 8px;
+      padding: 6px 8px;
+      background: var(--bg-secondary);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .meta strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .checks {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .check-group {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .check-group-title {
+      padding: 5px 8px;
+      background: var(--bg-secondary);
+      font-weight: 600;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .check-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .check-row:last-child { border-bottom: none; }
+
+    .check-name {
+      color: var(--text-secondary);
+    }
+
+    .threshold {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .badge {
+      min-width: 48px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .badge.pass {
+      color: var(--pass);
+      background: var(--pass-bg);
+    }
+
+    .badge.fail {
+      color: var(--fail);
+      background: var(--fail-bg);
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button.secondary {
+      flex: 1;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    button.secondary:hover { background: var(--bg-secondary); }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .token-label {
+      margin-top: 2px;
+      min-height: 0;
+      color: var(--text-secondary);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .token-label:empty {
+      display: none;
+    }
+
+    .token-label.has-token {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .check-group.active {
+      border-color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--text);
+    }
+
+    .check-group.active .check-group-title {
+      background: var(--bg-tertiary);
+    }
+
+    .check-group.dimmed {
+      opacity: 0.55;
+    }
+  </style>
+</head>
+<body>
+  <h1>Contrast Checker</h1>
+  <p class="subtitle">WCAG 2.1 · AA / AAA text contrast</p>
+
+  <div class="preview" id="preview">
+    <div class="preview-sample" id="previewSample">Aa Bb Cc</div>
+  </div>
+
+  <div class="ratio-block">
+    <div class="ratio-value" id="ratioValue">—</div>
+    <div class="ratio-label">contrast ratio</div>
+  </div>
+
+  <div class="colors">
+    <div class="color-field">
+      <label for="fgHex">Foreground</label>
+      <div class="color-row">
+        <input type="color" id="fgPicker" value="#1e1e1e" aria-label="Foreground color picker" />
+        <input type="text" id="fgHex" value="#1E1E1E" maxlength="7" spellcheck="false" aria-label="Foreground hex" />
+      </div>
+      <div class="token-label" id="fgToken" title=""></div>
+    </div>
+    <button class="swap" id="swapBtn" title="Swap colors" aria-label="Swap foreground and background">⇄</button>
+    <div class="color-field">
+      <label for="bgHex">Background</label>
+      <div class="color-row">
+        <input type="color" id="bgPicker" value="#ffffff" aria-label="Background color picker" />
+        <input type="text" id="bgHex" value="#FFFFFF" maxlength="7" spellcheck="false" aria-label="Background hex" />
+      </div>
+      <div class="token-label" id="bgToken" title=""></div>
+    </div>
+  </div>
+
+  <p class="meta" id="meta">Select a layer to check contrast, or pick colors manually.</p>
+
+  <div class="checks">
+    <div class="check-group" id="groupNormal">
+      <div class="check-group-title">Normal text (&lt; 18pt / &lt; 14pt bold)</div>
+      <div class="check-row">
+        <span class="check-name">AA</span>
+        <span class="threshold">≥ 4.5:1</span>
+        <span class="badge" id="aaNormal">—</span>
+      </div>
+      <div class="check-row">
+        <span class="check-name">AAA</span>
+        <span class="threshold">≥ 7:1</span>
+        <span class="badge" id="aaaNormal">—</span>
+      </div>
+    </div>
+
+    <div class="check-group" id="groupLarge">
+      <div class="check-group-title">Large text (≥ 18pt or ≥ 14pt bold)</div>
+      <div class="check-row">
+        <span class="check-name">AA</span>
+        <span class="threshold">≥ 3:1</span>
+        <span class="badge" id="aaLarge">—</span>
+      </div>
+      <div class="check-row">
+        <span class="check-name">AAA</span>
+        <span class="threshold">≥ 4.5:1</span>
+        <span class="badge" id="aaaLarge">—</span>
+      </div>
+    </div>
+
+    <div class="check-group" id="groupUi">
+      <div class="check-group-title">UI components / graphics (1.4.11)</div>
+      <div class="check-row">
+        <span class="check-name">AA</span>
+        <span class="threshold">≥ 3:1</span>
+        <span class="badge" id="aaUi">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="secondary" id="refreshBtn">Use selection</button>
+    <button class="secondary" id="closeBtn">Close</button>
+  </div>
+  <p class="hint">Tip: select one layer (fill + parent bg), or two layers (fg + bg). Changing FG/BG applies the color to those layers.</p>
+
+  <script>
+    const THRESHOLDS = {
+      aaNormal: 4.5,
+      aaaNormal: 7,
+      aaLarge: 3,
+      aaaLarge: 4.5,
+      aaUi: 3,
+    };
+
+    const fgPicker = document.getElementById('fgPicker');
+    const bgPicker = document.getElementById('bgPicker');
+    const fgHex = document.getElementById('fgHex');
+    const bgHex = document.getElementById('bgHex');
+    const fgToken = document.getElementById('fgToken');
+    const bgToken = document.getElementById('bgToken');
+    const ratioValue = document.getElementById('ratioValue');
+    const preview = document.getElementById('preview');
+    const previewSample = document.getElementById('previewSample');
+    const meta = document.getElementById('meta');
+    const groupNormal = document.getElementById('groupNormal');
+    const groupLarge = document.getElementById('groupLarge');
+    const groupUi = document.getElementById('groupUi');
+
+    function channelToLinear(c) {
+      return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    }
+
+    function relativeLuminance({ r, g, b }) {
+      return (
+        0.2126 * channelToLinear(r) +
+        0.7152 * channelToLinear(g) +
+        0.0722 * channelToLinear(b)
+      );
+    }
+
+    function contrastRatio(fg, bg) {
+      const L1 = relativeLuminance(fg);
+      const L2 = relativeLuminance(bg);
+      const lighter = Math.max(L1, L2);
+      const darker = Math.min(L1, L2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    function rgbToHex({ r, g, b }) {
+      const toByte = (n) => Math.round(Math.min(1, Math.max(0, n)) * 255);
+      return (
+        '#' +
+        [toByte(r), toByte(g), toByte(b)]
+          .map((n) => n.toString(16).padStart(2, '0'))
+          .join('')
+          .toUpperCase()
+      );
+    }
+
+    function hexToRgb(hex) {
+      const raw = hex.trim().replace(/^#/, '');
+      if (!/^[0-9a-fA-F]{6}$/.test(raw)) return null;
+      return {
+        r: parseInt(raw.slice(0, 2), 16) / 255,
+        g: parseInt(raw.slice(2, 4), 16) / 255,
+        b: parseInt(raw.slice(4, 6), 16) / 255,
+      };
+    }
+
+    function sourceRgb(source) {
+      if (!source) return null;
+      // New payload: { rgb, token, style, from }. Legacy: plain { r,g,b }.
+      if (source.rgb && typeof source.rgb.r === 'number') return source.rgb;
+      if (typeof source.r === 'number') return source;
+      return null;
+    }
+
+    function setBadge(id, pass) {
+      const el = document.getElementById(id);
+      el.textContent = pass ? 'PASS' : 'FAIL';
+      el.className = 'badge ' + (pass ? 'pass' : 'fail');
+    }
+
+    function setTokenLabel(el, source) {
+      if (!source) {
+        el.textContent = '';
+        el.title = '';
+        el.classList.remove('has-token');
+        return;
+      }
+      let label = '';
+      if (source.token) label = 'Token · ' + source.token;
+      else if (source.style) label = 'Style · ' + source.style;
+      else if (source.from) label = source.from;
+      el.textContent = label;
+      el.title = label;
+      el.classList.toggle('has-token', Boolean(source.token || source.style));
+    }
+
+    function highlightApplicable(isLarge) {
+      groupNormal.classList.remove('active', 'dimmed');
+      groupLarge.classList.remove('active', 'dimmed');
+      groupUi.classList.remove('active', 'dimmed');
+      if (isLarge === true) {
+        groupLarge.classList.add('active');
+        groupNormal.classList.add('dimmed');
+      } else if (isLarge === false) {
+        groupNormal.classList.add('active');
+        groupLarge.classList.add('dimmed');
+      }
+    }
+
+    function updateFromColors(fg, bg, extras) {
+      const ratio = contrastRatio(fg, bg);
+      // Do not round when comparing to thresholds (WCAG guidance).
+      ratioValue.textContent = ratio.toFixed(2) + ' : 1';
+
+      const fgHexValue = rgbToHex(fg);
+      const bgHexValue = rgbToHex(bg);
+      fgPicker.value = fgHexValue.toLowerCase();
+      bgPicker.value = bgHexValue.toLowerCase();
+      fgHex.value = fgHexValue;
+      bgHex.value = bgHexValue;
+
+      preview.style.backgroundColor = bgHexValue;
+      previewSample.style.color = fgHexValue;
+
+      const large =
+        extras && extras.isLargeText != null
+          ? extras.isLargeText
+          : null;
+      previewSample.classList.toggle('large', large === true);
+      highlightApplicable(large);
+
+      setBadge('aaNormal', ratio >= THRESHOLDS.aaNormal);
+      setBadge('aaaNormal', ratio >= THRESHOLDS.aaaNormal);
+      setBadge('aaLarge', ratio >= THRESHOLDS.aaLarge);
+      setBadge('aaaLarge', ratio >= THRESHOLDS.aaaLarge);
+      setBadge('aaUi', ratio >= THRESHOLDS.aaUi);
+
+      if (extras && extras.fgSource !== undefined) setTokenLabel(fgToken, extras.fgSource);
+      if (extras && extras.bgSource !== undefined) setTokenLabel(bgToken, extras.bgSource);
+
+      if (extras && extras.message) {
+        let text = extras.message;
+        if (extras.nodeName) {
+          text =
+            '<strong>' +
+            escapeHtml(extras.nodeName) +
+            '</strong> — ' +
+            escapeHtml(extras.message);
+        }
+        if (extras.fontSize != null) {
+          const weight = extras.fontWeight != null ? extras.fontWeight : '—';
+          const sizeLabel =
+            large === true ? 'large text' : large === false ? 'normal text' : 'size unknown';
+          text +=
+            '<br>Text: ' +
+            extras.fontSize +
+            'px · weight ' +
+            weight +
+            ' · ' +
+            sizeLabel;
+        }
+        meta.innerHTML = text;
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    let applyTimer = null;
+
+    function postApplyColor(role, color) {
+      parent.postMessage(
+        { pluginMessage: { type: 'apply-color', role: role, color: color } },
+        '*',
+      );
+    }
+
+    function postApplyBoth(fg, bg) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: 'apply-colors',
+            foreground: fg,
+            background: bg,
+          },
+        },
+        '*',
+      );
+    }
+
+    function scheduleApply(role, color) {
+      if (applyTimer) clearTimeout(applyTimer);
+      applyTimer = setTimeout(function () {
+        applyTimer = null;
+        postApplyColor(role, color);
+      }, 120);
+    }
+
+    function syncFromInputs(manual, role) {
+      const fg = hexToRgb(fgHex.value);
+      const bg = hexToRgb(bgHex.value);
+      if (!fg || !bg) return;
+      if (manual) {
+        if (role === 'foreground' || role === 'both') {
+          setTokenLabel(fgToken, { from: 'applied to selection' });
+        }
+        if (role === 'background' || role === 'both') {
+          setTokenLabel(bgToken, { from: 'applied to selection' });
+        }
+      }
+      updateFromColors(fg, bg, {
+        message: manual
+          ? 'Applying color to the linked selection layer…'
+          : meta.textContent,
+        fgSource:
+          manual && (role === 'foreground' || role === 'both')
+            ? { from: 'applied to selection' }
+            : undefined,
+        bgSource:
+          manual && (role === 'background' || role === 'both')
+            ? { from: 'applied to selection' }
+            : undefined,
+      });
+
+      if (!manual || !role) return;
+      if (role === 'both') {
+        if (applyTimer) clearTimeout(applyTimer);
+        postApplyBoth(fg, bg);
+        return;
+      }
+      scheduleApply(role, role === 'foreground' ? fg : bg);
+    }
+
+    function bindColorPair(picker, hexInput, role) {
+      picker.addEventListener('input', () => {
+        hexInput.value = picker.value.toUpperCase();
+        syncFromInputs(true, role);
+      });
+      hexInput.addEventListener('input', () => {
+        const rgb = hexToRgb(hexInput.value);
+        if (!rgb) return;
+        picker.value = rgbToHex(rgb).toLowerCase();
+        syncFromInputs(true, role);
+      });
+      hexInput.addEventListener('blur', () => {
+        const rgb = hexToRgb(hexInput.value);
+        if (rgb) hexInput.value = rgbToHex(rgb);
+      });
+    }
+
+    bindColorPair(fgPicker, fgHex, 'foreground');
+    bindColorPair(bgPicker, bgHex, 'background');
+
+    document.getElementById('swapBtn').onclick = () => {
+      const a = fgHex.value;
+      fgHex.value = bgHex.value;
+      bgHex.value = a;
+      const aLabel = fgToken.textContent;
+      const aTitle = fgToken.title;
+      const aClass = fgToken.className;
+      fgToken.textContent = bgToken.textContent;
+      fgToken.title = bgToken.title;
+      fgToken.className = bgToken.className;
+      bgToken.textContent = aLabel;
+      bgToken.title = aTitle;
+      bgToken.className = aClass;
+      syncFromInputs(true, 'both');
+    };
+
+    document.getElementById('refreshBtn').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'request-selection' } }, '*');
+    };
+
+    document.getElementById('closeBtn').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+    };
+
+    window.onmessage = (event) => {
+      const msg = event.data && event.data.pluginMessage;
+      if (!msg || msg.type !== 'selection') return;
+
+      const fg = sourceRgb(msg.foreground);
+      const bg = sourceRgb(msg.background);
+
+      // Empty selection: keep manual colors, update copy only.
+      if (!msg.foreground && !msg.background && !msg.nodeName) {
+        meta.textContent = msg.message || 'Select a layer to check contrast, or pick colors manually.';
+        setTokenLabel(fgToken, null);
+        setTokenLabel(bgToken, null);
+        highlightApplicable(null);
+        return;
+      }
+
+      // Partial read: update only what we resolved; never invent colors from stale inputs.
+      if (!fg || !bg) {
+        meta.textContent = msg.message || 'Could not read solid fills from the selection.';
+        if (fg) {
+          const currentBg = hexToRgb(bgHex.value);
+          if (currentBg) {
+            updateFromColors(fg, currentBg, {
+              message: msg.message,
+              nodeName: msg.nodeName,
+              fontSize: msg.fontSize,
+              fontWeight: msg.fontWeight,
+              isLargeText: msg.isLargeText,
+              fgSource: msg.foreground,
+              bgSource: { from: 'manual (kept)' },
+            });
+          }
+        }
+        return;
+      }
+
+      updateFromColors(fg, bg, {
+        message: msg.message,
+        nodeName: msg.nodeName,
+        fontSize: msg.fontSize,
+        fontWeight: msg.fontWeight,
+        isLargeText: msg.isLargeText,
+        fgSource: msg.foreground,
+        bgSource: msg.background,
+      });
+    };
+
+    syncFromInputs(false);
+  </script>
+</body>
+</html>
