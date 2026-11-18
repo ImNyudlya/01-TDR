@@ -16,15 +16,27 @@ Figma plugin that checks text/UI color contrast against **WCAG 2.1 AA and AAA**.
 
 ## Share / install (no build needed)
 
-The repo includes compiled `code.js`, so others can run the plugin without Node.
+**Send this file to others:**  
+`plugins/01-TDR-a11y-contrast-cheker-cursor-01/share/A11yContrast.zip`
 
-1. Clone or download this folder: `plugins/01-TDR-a11y-contrast-cheker-cursor-01`
-2. Open Figma Desktop
+Inside the zip there are only 3 files: `manifest.json`, `code.js`, `ui.html`.
+
+### Install steps (friend)
+
+1. Unzip `A11yContrast.zip`
+2. Open **Figma Desktop** (browser will not work for local plugins)
 3. **Plugins → Development → Import plugin from manifest…**
-4. Select `manifest.json` inside that folder
+4. Select `manifest.json` **inside** the unzipped `A11yContrast` folder
 5. Run **Plugins → Development → A11yContrast**
 
-Or zip the whole plugin folder (must include `manifest.json`, `code.js`, `ui.html`) and send the zip.
+### If “loading the plugin environment” error
+
+- Must be **Figma Desktop**, not figma.com in Chrome
+- On Mac: allow Figma access to Downloads/Desktop (Privacy → Files and Folders)
+- Re-import the manifest (remove old Development entry first)
+- Open **Show/Hide console** and check the red error line
+
+Do **not** import `manifest.json` from the GitHub repo root — only from the plugin folder / `share/A11yContrast`.
 
 ## Thresholds
 

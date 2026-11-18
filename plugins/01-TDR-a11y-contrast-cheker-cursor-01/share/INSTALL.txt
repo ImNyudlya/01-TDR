@@ -1,0 +1,21 @@
+A11yContrast — install (Figma Desktop only)
+
+1. Unzip A11yContrast.zip
+2. You must see a folder that contains EXACTLY:
+   - manifest.json
+   - code.js
+   - ui.html
+3. Open Figma DESKTOP app (not browser figma.com)
+4. Menu: Plugins → Development → Import plugin from manifest…
+5. Select manifest.json INSIDE the A11yContrast folder
+6. Run: Plugins → Development → A11yContrast
+
+If error "loading the plugin environment":
+- Use Figma Desktop, not the browser
+- On Mac: System Settings → Privacy & Security → Files and Folders
+  → allow Figma access to Downloads / Desktop
+- Remove old Development import and import again
+- Click "Show/Hide console" and send a screenshot of the red error text
+
+Do NOT import manifest from the whole GitHub repo root.
+Use this share/A11yContrast package (or the nested plugin folder that has code.js).
