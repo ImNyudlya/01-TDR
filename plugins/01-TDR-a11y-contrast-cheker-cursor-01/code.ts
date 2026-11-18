@@ -27,12 +27,28 @@ type SelectionPayload = {
   message: string;
 };
 
+type TokenSwatch = {
+  id: string;
+  name: string;
+  collection: string;
+  mode: string;
+  rgb: ContrastRGB;
+};
+
+type TokensPayload = {
+  type: 'tokens';
+  tokens: TokenSwatch[];
+  message: string;
+};
+
 type UiToPluginMessage =
   | { type: 'request-selection' }
+  | { type: 'request-tokens' }
   | { type: 'close' }
   | { type: 'resize'; width: number; height: number }
   | { type: 'apply-color'; role: 'foreground' | 'background'; color: ContrastRGB }
-  | { type: 'apply-colors'; foreground: ContrastRGB; background: ContrastRGB };
+  | { type: 'apply-colors'; foreground: ContrastRGB; background: ContrastRGB }
+  | { type: 'apply-token'; role: 'foreground' | 'background'; variableId: string };
 
 type ColorTargets = {
   foregroundId: string | null;
@@ -40,8 +56,10 @@ type ColorTargets = {
 };
 
 const UI_WIDTH = 360;
-const UI_HEIGHT = 700;
+const UI_HEIGHT = 780;
 const CANVAS_WHITE: ContrastRGB = { r: 1, g: 1, b: 1 };
+/** Soft cap so huge DS files stay responsive in the UI. */
+const MAX_TOKEN_SWATCHES = 800;
 
 /** Ignore stale async selection resolves when the user clicks quickly. */
 let selectionEpoch = 0;
@@ -252,6 +270,166 @@ async function applyColorToTarget(
   }
 }
 
+function isRgbValue(value: VariableValue): value is RGB {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !('type' in value) &&
+    'r' in value &&
+    'g' in value &&
+    'b' in value
+  );
+}
+
+function isAliasValue(value: VariableValue): value is VariableAlias {
+  return typeof value === 'object' && value !== null && 'type' in value && value.type === 'VARIABLE_ALIAS';
+}
+
+/** Resolve COLOR variable value (follows aliases) for a given mode. */
+async function resolveColorVariableValue(
+  value: VariableValue,
+  depth = 0,
+): Promise<ContrastRGB | null> {
+  if (depth > 12) return null;
+
+  if (isAliasValue(value)) {
+    const aliased = await figma.variables.getVariableByIdAsync(value.id);
+    if (!aliased || aliased.resolvedType !== 'COLOR') return null;
+    const collection = await figma.variables.getVariableCollectionByIdAsync(
+      aliased.variableCollectionId,
+    );
+    if (!collection) return null;
+    const modeId = collection.defaultModeId;
+    const next = aliased.valuesByMode[modeId];
+    if (next === undefined) return null;
+    return resolveColorVariableValue(next, depth + 1);
+  }
+
+  if (isRgbValue(value)) {
+    return { r: value.r, g: value.g, b: value.b };
+  }
+
+  return null;
+}
+
+/**
+ * Local COLOR variables (default mode). Library descriptors without values are
+ * skipped — RGB is required for contrast suggestions.
+ */
+async function loadTokenCatalog(): Promise<TokensPayload> {
+  const tokens: TokenSwatch[] = [];
+
+  try {
+    const [variables, collections] = await Promise.all([
+      figma.variables.getLocalVariablesAsync('COLOR'),
+      figma.variables.getLocalVariableCollectionsAsync(),
+    ]);
+
+    const collectionById = new Map(collections.map((c) => [c.id, c]));
+
+    for (const variable of variables) {
+      if (tokens.length >= MAX_TOKEN_SWATCHES) break;
+      const collection = collectionById.get(variable.variableCollectionId);
+      if (!collection) continue;
+
+      const mode =
+        collection.modes.find((m) => m.modeId === collection.defaultModeId) ??
+        collection.modes[0];
+      if (!mode) continue;
+
+      const raw = variable.valuesByMode[mode.modeId];
+      if (raw === undefined) continue;
+
+      const rgb = await resolveColorVariableValue(raw);
+      if (!rgb) continue;
+
+      tokens.push({
+        id: variable.id,
+        name: variable.name,
+        collection: collection.name,
+        mode: mode.name,
+        rgb,
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load variables.';
+    return { type: 'tokens', tokens: [], message };
+  }
+
+  const message =
+    tokens.length === 0
+      ? 'No local color variables in this file. Add variables to enable suggestions.'
+      : `Loaded ${tokens.length} local color token${tokens.length === 1 ? '' : 's'} (default mode).`;
+
+  return { type: 'tokens', tokens, message };
+}
+
+async function pushTokenCatalog(): Promise<void> {
+  const payload = await loadTokenCatalog();
+  figma.ui.postMessage(payload);
+}
+
+async function applyTokenToTarget(
+  role: 'foreground' | 'background',
+  variableId: string,
+): Promise<void> {
+  const targetId = role === 'foreground' ? colorTargets.foregroundId : colorTargets.backgroundId;
+  if (!targetId) {
+    figma.notify(
+      role === 'foreground'
+        ? 'Select a layer to apply the foreground token.'
+        : 'No writable background layer for this token.',
+    );
+    return;
+  }
+
+  const variable = await figma.variables.getVariableByIdAsync(variableId);
+  if (!variable || variable.resolvedType !== 'COLOR') {
+    figma.notify('Token not found or is not a color variable.');
+    return;
+  }
+
+  const node = await figma.getNodeByIdAsync(targetId);
+  if (!node || node.type === 'DOCUMENT' || node.type === 'PAGE' || !('fills' in node)) {
+    figma.notify('Target layer is gone. Reselect and try again.');
+    return;
+  }
+
+  const geometry = node as MinimalFillsMixin & GeometryMixin;
+  if (geometry.fillStyleId && geometry.fillStyleId !== figma.mixed) {
+    await geometry.setFillStyleIdAsync('');
+  }
+
+  const paints: Paint[] =
+    geometry.fills === figma.mixed ? [] : geometry.fills.map((paint) => ({ ...paint }));
+
+  let solidIndex = -1;
+  for (let i = paints.length - 1; i >= 0; i--) {
+    if (paints[i].visible === false) continue;
+    if (paints[i].type !== 'SOLID') continue;
+    solidIndex = i;
+    break;
+  }
+
+  const baseSolid: SolidPaint =
+    solidIndex >= 0 && paints[solidIndex].type === 'SOLID'
+      ? { ...(paints[solidIndex] as SolidPaint) }
+      : { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 1, visible: true };
+
+  const bound = figma.variables.setBoundVariableForPaint(baseSolid, 'color', variable);
+  if (solidIndex >= 0) paints[solidIndex] = bound;
+  else paints.push(bound);
+
+  if ('setFillsAsync' in geometry && typeof geometry.setFillsAsync === 'function') {
+    await geometry.setFillsAsync(paints);
+  } else {
+    geometry.fills = paints;
+  }
+
+  figma.notify(`Applied “${variable.name}” to ${role}.`, { timeout: 1500 });
+  await pushSelection();
+}
+
 async function resolveForeground(node: SceneNode, background: ContrastRGB): Promise<ColorSource | null> {
   const fills = getNodeFills(node);
   if (!fills) return null;
@@ -414,10 +592,16 @@ figma.on('selectionchange', () => {
   void pushSelection();
 });
 void pushSelection();
+void pushTokenCatalog();
 
 figma.ui.onmessage = (msg: UiToPluginMessage) => {
   if (msg.type === 'request-selection') {
     void pushSelection();
+    return;
+  }
+
+  if (msg.type === 'request-tokens') {
+    void pushTokenCatalog();
     return;
   }
 
@@ -438,6 +622,11 @@ figma.ui.onmessage = (msg: UiToPluginMessage) => {
       await applyColorToTarget('foreground', msg.foreground);
       await applyColorToTarget('background', msg.background);
     })();
+    return;
+  }
+
+  if (msg.type === 'apply-token') {
+    void applyTokenToTarget(msg.role, msg.variableId);
     return;
   }
 

@@ -308,10 +308,139 @@
     .check-group.dimmed {
       opacity: 0.55;
     }
+
+    .suggestions {
+      display: none;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .suggestions.visible {
+      display: block;
+    }
+
+    .suggestions-header {
+      padding: 6px 8px;
+      background: var(--bg-secondary);
+      font-weight: 600;
+      font-size: 11px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .suggest-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 2px;
+      margin: 6px 8px 0;
+      padding: 2px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-secondary);
+    }
+
+    .suggest-mode button {
+      height: 26px;
+      padding: 0 4px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 1.15;
+      cursor: pointer;
+    }
+
+    .suggest-mode button:hover {
+      color: var(--text);
+    }
+
+    .suggest-mode button.active {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 0 0 1px var(--border);
+    }
+
+    .suggestions-sub {
+      padding: 4px 8px 0;
+      color: var(--text-secondary);
+      font-size: 10px;
+    }
+
+    .suggestion-list {
+      display: grid;
+      gap: 4px;
+      padding: 6px 8px 8px;
+    }
+
+    .suggestion-item {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+      width: 100%;
+      padding: 5px 6px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .suggestion-item:hover {
+      background: var(--bg-secondary);
+    }
+
+    .suggestion-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .suggestion-meta {
+      min-width: 0;
+    }
+
+    .suggestion-name {
+      display: block;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .suggestion-path {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .suggestion-ratio {
+      font-variant-numeric: tabular-nums;
+      font-size: 10px;
+      color: var(--pass);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .suggestions-empty {
+      padding: 8px;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
-  <h1>Contrast Checker</h1>
+  <h1>A11yContrast</h1>
   <p class="subtitle">WCAG 2.1 · AA / AAA text contrast</p>
 
   <div class="preview" id="preview">
@@ -384,6 +513,25 @@
     </div>
   </div>
 
+  <div class="suggestions" id="suggestions" hidden>
+    <div class="suggestions-header">Suggested tokens</div>
+    <div class="suggest-mode" role="radiogroup" aria-label="Suggestion sort mode">
+      <button type="button" data-mode="similar" class="active" aria-pressed="true">Similar look</button>
+      <button type="button" data-mode="contrast" aria-pressed="false">Highest contrast</button>
+      <button type="button" data-mode="collection" aria-pressed="false">Same collection</button>
+    </div>
+    <div class="suggestions-sub" id="suggestionsTarget">Passing AA with current partner</div>
+    <div id="suggestionsFgWrap">
+      <div class="suggestions-sub">Replace foreground</div>
+      <div class="suggestion-list" id="suggestionsFg"></div>
+    </div>
+    <div id="suggestionsBgWrap">
+      <div class="suggestions-sub">Replace background</div>
+      <div class="suggestion-list" id="suggestionsBg"></div>
+    </div>
+    <div class="suggestions-empty" id="suggestionsEmpty" hidden></div>
+  </div>
+
   <div class="actions">
     <button class="secondary" id="refreshBtn">Use selection</button>
     <button class="secondary" id="closeBtn">Close</button>
@@ -412,6 +560,24 @@
     const groupNormal = document.getElementById('groupNormal');
     const groupLarge = document.getElementById('groupLarge');
     const groupUi = document.getElementById('groupUi');
+    const suggestionsEl = document.getElementById('suggestions');
+    const suggestionsTarget = document.getElementById('suggestionsTarget');
+    const suggestionsFg = document.getElementById('suggestionsFg');
+    const suggestionsBg = document.getElementById('suggestionsBg');
+    const suggestionsFgWrap = document.getElementById('suggestionsFgWrap');
+    const suggestionsBgWrap = document.getElementById('suggestionsBgWrap');
+    const suggestionsEmpty = document.getElementById('suggestionsEmpty');
+
+    /** @type {Array<{id:string,name:string,collection:string,mode:string,rgb:{r:number,g:number,b:number}}>} */
+    let tokenCatalog = [];
+    let lastIsLarge = null;
+    let lastFgRgb = null;
+    let lastBgRgb = null;
+    let lastFgTokenName = null;
+    let lastBgTokenName = null;
+    /** @type {'similar' | 'contrast' | 'collection'} */
+    let suggestMode = 'similar';
+    const SUGGEST_LIMIT = 5;
 
     function channelToLinear(c) {
       return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
@@ -497,6 +663,189 @@
       }
     }
 
+    function applicableThreshold(isLarge) {
+      if (isLarge === true) {
+        return { aa: THRESHOLDS.aaLarge, aaa: THRESHOLDS.aaaLarge, label: 'large text' };
+      }
+      return { aa: THRESHOLDS.aaNormal, aaa: THRESHOLDS.aaaNormal, label: 'normal text' };
+    }
+
+    function luminanceDistance(a, b) {
+      return Math.abs(relativeLuminance(a) - relativeLuminance(b));
+    }
+
+    /** Cheap perceptual-ish distance in linear RGB (Similar look). */
+    function colorDistance(a, b) {
+      const dr = a.r - b.r;
+      const dg = a.g - b.g;
+      const db = a.b - b.b;
+      return Math.sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    function collectionForTokenName(tokenName) {
+      if (!tokenName) return null;
+      for (let i = 0; i < tokenCatalog.length; i++) {
+        if (tokenCatalog[i].name === tokenName) return tokenCatalog[i].collection;
+      }
+      return null;
+    }
+
+    function findPassingTokens(partnerRgb, currentRgb, minRatio, preferredCollection) {
+      const scored = [];
+      for (let i = 0; i < tokenCatalog.length; i++) {
+        const token = tokenCatalog[i];
+        if (suggestMode === 'collection') {
+          if (!preferredCollection || token.collection !== preferredCollection) continue;
+        }
+        const ratio = contrastRatio(token.rgb, partnerRgb);
+        if (ratio < minRatio) continue;
+        // Skip near-identical to current color.
+        if (colorDistance(token.rgb, currentRgb) < 0.02) continue;
+        scored.push({
+          token: token,
+          ratio: ratio,
+          lookDistance: colorDistance(token.rgb, currentRgb),
+          lumDistance: luminanceDistance(token.rgb, currentRgb),
+        });
+      }
+
+      scored.sort(function (a, b) {
+        if (suggestMode === 'contrast') {
+          if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+          return a.lookDistance - b.lookDistance;
+        }
+        // similar + collection: nearest look first, then higher ratio
+        if (a.lookDistance !== b.lookDistance) return a.lookDistance - b.lookDistance;
+        return b.ratio - a.ratio;
+      });
+      return scored.slice(0, SUGGEST_LIMIT);
+    }
+
+    function renderSuggestionList(container, items, role) {
+      container.innerHTML = '';
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'suggestion-item';
+        button.title = 'Apply token to ' + role;
+
+        const swatch = document.createElement('span');
+        swatch.className = 'suggestion-swatch';
+        swatch.style.backgroundColor = rgbToHex(item.token.rgb);
+
+        const metaWrap = document.createElement('span');
+        metaWrap.className = 'suggestion-meta';
+        const nameEl = document.createElement('span');
+        nameEl.className = 'suggestion-name';
+        nameEl.textContent = item.token.name;
+        const pathEl = document.createElement('span');
+        pathEl.className = 'suggestion-path';
+        pathEl.textContent = item.token.collection + ' · ' + item.token.mode;
+        metaWrap.appendChild(nameEl);
+        metaWrap.appendChild(pathEl);
+
+        const ratioEl = document.createElement('span');
+        ratioEl.className = 'suggestion-ratio';
+        ratioEl.textContent = item.ratio.toFixed(2) + ':1';
+
+        button.appendChild(swatch);
+        button.appendChild(metaWrap);
+        button.appendChild(ratioEl);
+        button.addEventListener('click', function () {
+          parent.postMessage(
+            {
+              pluginMessage: {
+                type: 'apply-token',
+                role: role,
+                variableId: item.token.id,
+              },
+            },
+            '*',
+          );
+        });
+        container.appendChild(button);
+      }
+    }
+
+    function updateSuggestions(fg, bg, isLarge) {
+      lastFgRgb = fg;
+      lastBgRgb = bg;
+      const level = applicableThreshold(isLarge);
+      const ratio = contrastRatio(fg, bg);
+      const failing = ratio < level.aa;
+
+      if (!failing) {
+        suggestionsEl.hidden = true;
+        suggestionsEl.classList.remove('visible');
+        return;
+      }
+
+      suggestionsEl.hidden = false;
+      suggestionsEl.classList.add('visible');
+
+      const modeHint =
+        suggestMode === 'contrast'
+          ? 'Sorted by highest contrast.'
+          : suggestMode === 'collection'
+            ? 'Filtered to the same variable collection.'
+            : 'Sorted by similar look.';
+      suggestionsTarget.textContent =
+        'Need ≥ ' + level.aa + ':1 for AA (' + level.label + '). ' + modeHint;
+
+      if (!tokenCatalog.length) {
+        suggestionsFgWrap.hidden = true;
+        suggestionsBgWrap.hidden = true;
+        suggestionsEmpty.hidden = false;
+        suggestionsEmpty.textContent =
+          'No local color variables loaded. Create variables in the file to get suggestions.';
+        return;
+      }
+
+      const fgCollection = collectionForTokenName(lastFgTokenName);
+      const bgCollection = collectionForTokenName(lastBgTokenName);
+
+      if (suggestMode === 'collection' && !fgCollection && !bgCollection) {
+        suggestionsFgWrap.hidden = true;
+        suggestionsBgWrap.hidden = true;
+        suggestionsEmpty.hidden = false;
+        suggestionsEmpty.textContent =
+          'Same collection needs a bound variable on FG or BG. Select token-styled layers.';
+        return;
+      }
+
+      suggestionsEmpty.hidden = true;
+      const fgItems = findPassingTokens(bg, fg, level.aa, fgCollection);
+      const bgItems = findPassingTokens(fg, bg, level.aa, bgCollection);
+
+      suggestionsFgWrap.hidden = fgItems.length === 0;
+      suggestionsBgWrap.hidden = bgItems.length === 0;
+      renderSuggestionList(suggestionsFg, fgItems, 'foreground');
+      renderSuggestionList(suggestionsBg, bgItems, 'background');
+
+      if (fgItems.length === 0 && bgItems.length === 0) {
+        suggestionsEmpty.hidden = false;
+        suggestionsEmpty.textContent =
+          suggestMode === 'collection'
+            ? 'No AA-passing tokens in the same collection.'
+            : 'No local tokens reach AA against the current partner color.';
+      }
+    }
+
+    document.querySelectorAll('.suggest-mode button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const mode = btn.getAttribute('data-mode');
+        if (!mode || mode === suggestMode) return;
+        suggestMode = mode;
+        document.querySelectorAll('.suggest-mode button').forEach(function (b) {
+          const active = b.getAttribute('data-mode') === suggestMode;
+          b.classList.toggle('active', active);
+          b.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        if (lastFgRgb && lastBgRgb) updateSuggestions(lastFgRgb, lastBgRgb, lastIsLarge);
+      });
+    });
+
     function updateFromColors(fg, bg, extras) {
       const ratio = contrastRatio(fg, bg);
       // Do not round when comparing to thresholds (WCAG guidance).
@@ -515,7 +864,8 @@
       const large =
         extras && extras.isLargeText != null
           ? extras.isLargeText
-          : null;
+          : lastIsLarge;
+      lastIsLarge = large;
       previewSample.classList.toggle('large', large === true);
       highlightApplicable(large);
 
@@ -525,8 +875,14 @@
       setBadge('aaaLarge', ratio >= THRESHOLDS.aaaLarge);
       setBadge('aaUi', ratio >= THRESHOLDS.aaUi);
 
-      if (extras && extras.fgSource !== undefined) setTokenLabel(fgToken, extras.fgSource);
-      if (extras && extras.bgSource !== undefined) setTokenLabel(bgToken, extras.bgSource);
+      if (extras && extras.fgSource !== undefined) {
+        setTokenLabel(fgToken, extras.fgSource);
+        lastFgTokenName = extras.fgSource && extras.fgSource.token ? extras.fgSource.token : null;
+      }
+      if (extras && extras.bgSource !== undefined) {
+        setTokenLabel(bgToken, extras.bgSource);
+        lastBgTokenName = extras.bgSource && extras.bgSource.token ? extras.bgSource.token : null;
+      }
 
       if (extras && extras.message) {
         let text = extras.message;
@@ -551,6 +907,8 @@
         }
         meta.innerHTML = text;
       }
+
+      updateSuggestions(fg, bg, large);
     }
 
     function escapeHtml(str) {
@@ -672,7 +1030,17 @@
 
     window.onmessage = (event) => {
       const msg = event.data && event.data.pluginMessage;
-      if (!msg || msg.type !== 'selection') return;
+      if (!msg) return;
+
+      if (msg.type === 'tokens') {
+        tokenCatalog = Array.isArray(msg.tokens) ? msg.tokens : [];
+        const fg = hexToRgb(fgHex.value);
+        const bg = hexToRgb(bgHex.value);
+        if (fg && bg) updateSuggestions(fg, bg, lastIsLarge);
+        return;
+      }
+
+      if (msg.type !== 'selection') return;
 
       const fg = sourceRgb(msg.foreground);
       const bg = sourceRgb(msg.background);
@@ -683,6 +1051,10 @@
         setTokenLabel(fgToken, null);
         setTokenLabel(bgToken, null);
         highlightApplicable(null);
+        lastIsLarge = null;
+        const curFg = hexToRgb(fgHex.value);
+        const curBg = hexToRgb(bgHex.value);
+        if (curFg && curBg) updateSuggestions(curFg, curBg, null);
         return;
       }
 
@@ -718,6 +1090,7 @@
     };
 
     syncFromInputs(false);
+    parent.postMessage({ pluginMessage: { type: 'request-tokens' } }, '*');
   </script>
 </body>
 </html>

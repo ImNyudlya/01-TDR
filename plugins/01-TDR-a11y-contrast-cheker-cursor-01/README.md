@@ -1,4 +1,4 @@
-# WCAG Contrast Checker
+# A11yContrast
 
 Figma plugin that checks text/UI color contrast against **WCAG 2.1 AA and AAA**.
 

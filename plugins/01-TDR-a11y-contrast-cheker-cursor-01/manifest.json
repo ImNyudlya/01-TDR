@@ -1,5 +1,5 @@
 {
-  "name": "WCAG Contrast Checker",
+  "name": "A11yContrast",
   "id": "1704164791321826024",
   "api": "1.0.0",
   "main": "code.js",
